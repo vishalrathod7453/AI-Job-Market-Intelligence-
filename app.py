@@ -10,7 +10,7 @@ from streamlit_lottie import st_lottie
 # PAGE CONFIGURATION
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="AI Job Analytics Suite",
+    page_title="Job Market Analysis ",
     page_icon="💼",
     layout="wide",
     initial_sidebar_state="expanded"
