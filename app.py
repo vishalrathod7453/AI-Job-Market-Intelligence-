@@ -1,3 +1,5 @@
+import os
+import glob
 import pickle
 import numpy as np
 import pandas as pd
@@ -19,7 +21,6 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 st.markdown("""
     <style>
-    /* Dark Gradient Animated Background */
     body {
         background: linear-gradient(-45deg, #0f0c20, #15102a, #1a1b35, #0b132b);
         background-size: 400% 400%;
@@ -33,7 +34,6 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* Glassmorphism Card Effect */
     .glass-card {
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(12px);
@@ -52,7 +52,6 @@ st.markdown("""
         border-color: rgba(0, 198, 255, 0.4);
     }
 
-    /* Gradient Title Animation */
     .title-text {
         font-size: 2.8rem;
         font-weight: 800;
@@ -69,7 +68,6 @@ st.markdown("""
         100% { filter: drop-shadow(0 0 12px rgba(127, 0, 255, 0.6)); }
     }
 
-    /* Custom Metric Cards */
     .metric-box {
         text-align: center;
         background: rgba(15, 23, 42, 0.6);
@@ -90,7 +88,6 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    /* Style Streamlit Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 12px;
     }
@@ -117,23 +114,47 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# MODEL LOADING
+# ROBUST MODEL LOADING FUNCTION
 # -----------------------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def find_file(pattern):
+    """Search for matching pickle files case-insensitively in script directory."""
+    files = glob.glob(os.path.join(BASE_DIR, "*.pkl"))
+    for f in files:
+        if pattern.lower() in os.path.basename(f).lower():
+            return f
+    return None
+
 @st.cache_resource
-def load_models():
-    try:
-        with open("Model_1 Job Analytics.pkl", "rb") as f1:
+def load_models_from_disk():
+    m1_path = find_file("Model_1")
+    m2_path = find_file("Model_2")
+    
+    m1, m2 = None, None
+    if m1_path and os.path.exists(m1_path):
+        with open(m1_path, "rb") as f1:
             m1 = pickle.load(f1)
-        with open("Model_2 job analytics.pkl", "rb") as f2:
+    if m2_path and os.path.exists(m2_path):
+        with open(m2_path, "rb") as f2:
             m2 = pickle.load(f2)
-        return m1, m2
-    except FileNotFoundError as e:
-        st.error(f"⚠️ Model file missing: {e}. Ensure both pickle files are in the working directory.")
-        return None, None
+            
+    return m1, m2
 
-model_1, model_2 = load_models()
+model_1, model_2 = load_models_from_disk()
 
-# Categorical mappings
+# Sidebar fallback upload option if files are missing on disk
+if model_1 is None or model_2 is None:
+    st.sidebar.warning("⚠️ Model file(s) not found in directory.")
+    uploaded_m1 = st.sidebar.file_uploader("Upload Model 1 (.pkl)", type=["pkl"])
+    uploaded_m2 = st.sidebar.file_uploader("Upload Model 2 (.pkl)", type=["pkl"])
+    
+    if uploaded_m1:
+        model_1 = pickle.load(uploaded_m1)
+    if uploaded_m2:
+        model_2 = pickle.load(uploaded_m2)
+
+# Categorical Feature Options
 JOB_TITLES = ["Data Analyst", "Data Scientist", "Machine Learning Engineer", "Data Engineer", "AI Architect"]
 COMPANY_SIZES = ["Small (1-50)", "Medium (51-500)", "Large (500+)"]
 INDUSTRIES = ["Technology", "Finance", "Healthcare", "E-commerce", "Consulting"]
@@ -177,8 +198,7 @@ posting_year = st.sidebar.slider("Posting Year", 2020, 2026, 2025)
 hiring_urgency = st.sidebar.select_slider("Hiring Urgency Rating", options=[1, 2, 3, 4, 5], value=3)
 job_openings = st.sidebar.number_input("Open Positions Available", min_value=1, max_value=500, value=5)
 
-# Encode inputs into numerical features matching model dimensions
-# Feature length for Model 1 = 17, Feature length for Model 2 = 18 (includes continuous salary)
+# Encode inputs into numeric features matching model requirements
 m1_features = np.array([[
     JOB_TITLES.index(job_title),
     COMPANY_SIZES.index(company_size),
@@ -210,13 +230,12 @@ tab1, tab2 = st.tabs(["💵 Model 1: Salary Regression", "📊 Model 2: Job Clas
 with tab1:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("🔮 Estimated Annual Salary Prediction")
-    st.write("Model 1 uses **Linear Regression** to estimate the base compensation package for the configured profile.")
+    st.write("Model 1 uses **Linear Regression** to estimate base compensation.")
     
     if st.button("🚀 Predict Salary (Model 1)", key="btn_model_1"):
-        if model_1:
+        if model_1 is not None:
             try:
                 predicted_salary = model_1.predict(m1_features)[0]
-                # Fallback safeguard if unscaled output is negative or raw float
                 pred_val = abs(float(predicted_salary))
                 
                 col1, col2, col3 = st.columns(3)
@@ -270,15 +289,18 @@ with tab1:
 
             except Exception as err:
                 st.error(f"Error executing Model 1 prediction: {err}")
+        else:
+            st.error("Please upload or ensure 'Model_1 Job Analytics.pkl' exists in the project directory.")
+            
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# TAB 2: MODEL 2 (Logistic Regression Classification)
+# TAB 2: MODEL 2 (Logistic Regression)
 # -----------------------------------------------------------------------------
 with tab2:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("🎯 Job Categorization & Classification")
-    st.write("Model 2 uses **Logistic Regression** to analyze market positioning using profile metadata and salary benchmarks.")
+    st.write("Model 2 uses **Logistic Regression** to analyze market positioning using profile metadata and target salary.")
 
     custom_salary = st.number_input(
         "Target Annual Salary ($) for Classification Input",
@@ -288,11 +310,11 @@ with tab2:
         step=5000
     )
 
-    # Model 2 feature vector (18 features including salary)
+    # Insert salary at position 13 for Model 2's expected 18-feature input
     m2_features = np.insert(m1_features, 13, custom_salary).reshape(1, -1)
 
     if st.button("⚡ Classify Job Profile (Model 2)", key="btn_model_2"):
-        if model_2:
+        if model_2 is not None:
             try:
                 class_pred = model_2.predict(m2_features)[0]
                 class_probs = model_2.predict_proba(m2_features)[0]
@@ -305,13 +327,12 @@ with tab2:
                             <div class="metric-label">Predicted Class</div>
                             <div class="metric-value" style="color: #7f00ff;">Tier {class_pred}</div>
                             <p style="color: #94a3b8; margin-top: 10px; font-size: 0.85rem;">
-                                Classified based on parameters and input benchmark of ${custom_salary:,.0f}
+                                Classified using parameters & salary target of ${custom_salary:,.0f}
                             </p>
                         </div>
                     ''', unsafe_allow_html=True)
 
                 with col2:
-                    # Class Probabilities Bar Chart
                     classes = [f"Tier {c}" for c in model_2.classes_]
                     fig_bar = go.Figure(go.Bar(
                         x=classes,
@@ -333,4 +354,7 @@ with tab2:
 
             except Exception as err:
                 st.error(f"Error executing Model 2 classification: {err}")
+        else:
+            st.error("Please upload or ensure 'Model_2 job analytics.pkl' exists in the project directory.")
+            
     st.markdown('</div>', unsafe_allow_html=True)
