@@ -7,7 +7,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ANIMATED DARK NEUMORPHIC THEME
+# PAGE CONFIGURATION
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="AI Job Analytics Portal",
@@ -16,10 +16,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# -----------------------------------------------------------------------------
+# CUSTOM GLASSMORPHISM & ANIMATED CSS
+# -----------------------------------------------------------------------------
 st.markdown("""
     <style>
-    /* Animated Gradient Background */
-    .stApp {
+    body {
         background: linear-gradient(-45deg, #0f0c20, #15102a, #1a1b35, #0b132b);
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
@@ -32,16 +34,22 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* Glassmorphism Container Styling */
     .glass-card {
-        background: rgba(255, 255, 255, 0.04);
+        background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 16px;
         padding: 24px;
         box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
         margin-bottom: 20px;
+    }
+
+    .glass-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px 0 rgba(0, 198, 255, 0.25);
+        border-color: rgba(0, 198, 255, 0.4);
     }
 
     .title-text {
@@ -80,18 +88,18 @@ st.markdown("""
         margin-top: 4px;
     }
 
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
-    }
+    .stTabs [data-baseweb="tab-list"] { gap: 12px; }
 
     .stTabs [data-baseweb="tab"] {
         height: 50px;
+        white-space: pre-wrap;
         background-color: rgba(255, 255, 255, 0.05);
         border-radius: 10px;
         color: #cbd5e1;
         border: 1px solid rgba(255, 255, 255, 0.1);
         padding: 10px 20px;
         font-weight: 600;
+        transition: all 0.3s ease;
     }
 
     .stTabs [aria-selected="true"] {
@@ -104,59 +112,65 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. MODEL DISCOVERY & SAFE SCALAR EXTRATION PIPELINE
+# ROBUST MODEL LOADER WITH VALIDATION
 # -----------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def find_file(keyword):
-    """Dynamically search for pickle files matching exact or partial filenames."""
-    search_patterns = [
-        os.path.join(BASE_DIR, f"*{keyword}*.pkl"),
-        os.path.join(BASE_DIR, f"*{keyword}*.PKL"),
-        os.path.join(os.getcwd(), f"*{keyword}*.pkl")
-    ]
-    for pattern in search_patterns:
-        matches = glob.glob(pattern)
-        if matches:
-            return matches[0]
+def get_model_path(search_str):
+    files = glob.glob(os.path.join(BASE_DIR, "*.pkl"))
+    for f in files:
+        if search_str.lower() in os.path.basename(f).lower():
+            return f
     return None
 
 @st.cache_resource
 def load_models_from_disk():
-    m1_path = find_file("Model_1") or find_file("Model 1")
-    m2_path = find_file("Model_2") or find_file("Model 2")
+    m1_path = get_model_path("Model_1") or os.path.join(BASE_DIR, "Model_1 Job Analytics.pkl")
+    m2_path = get_model_path("Model_2") or os.path.join(BASE_DIR, "Model_2 job analytics.pkl")
     
     m1, m2 = None, None
-    if m1_path and os.path.exists(m1_path):
-        with open(m1_path, "rb") as f1:
-            m1 = pickle.load(f1)
-    if m2_path and os.path.exists(m2_path):
-        with open(m2_path, "rb") as f2:
-            m2 = pickle.load(f2)
+    if os.path.exists(m1_path):
+        try:
+            with open(m1_path, "rb") as f1:
+                m1 = pickle.load(f1)
+        except Exception:
+            pass
+            
+    if os.path.exists(m2_path):
+        try:
+            with open(m2_path, "rb") as f2:
+                m2 = pickle.load(f2)
+        except Exception:
+            pass
             
     return m1, m2
 
 model_1, model_2 = load_models_from_disk()
 
-# Sidebar fallback manual uploader
+# Sidebar fallback upload options with feature validation
 if model_1 is None or model_2 is None:
-    st.sidebar.warning("⚠️ Model file(s) not detected automatically.")
+    st.sidebar.warning("⚠️ Model file(s) missing from working directory.")
     if model_1 is None:
-        uploaded_m1 = st.sidebar.file_uploader("Upload Model 1 (.pkl)", type=["pkl"], key="up_m1")
-        if uploaded_m1:
-            model_1 = pickle.load(uploaded_m1)
-            
+        uploaded_m1 = st.sidebar.file_uploader("Upload Model 1 (.pkl) [LinearRegression]", type=["pkl"], key="up_m1")
+        if uploaded_m1 is not None:
+            obj = pickle.load(uploaded_m1)
+            if hasattr(obj, "n_features_in_") and obj.n_features_in_ == 17:
+                model_1 = obj
+                st.sidebar.success("Model 1 Loaded Successfully!")
+            else:
+                st.sidebar.error("Invalid Model 1 file. Expected LinearRegression model with 17 features.")
+
     if model_2 is None:
-        uploaded_m2 = st.sidebar.file_uploader("Upload Model 2 (.pkl)", type=["pkl"], key="up_m2")
-        if uploaded_m2:
-            model_2 = pickle.load(uploaded_m2)
+        uploaded_m2 = st.sidebar.file_uploader("Upload Model 2 (.pkl) [LogisticRegression]", type=["pkl"], key="up_m2")
+        if uploaded_m2 is not None:
+            obj = pickle.load(uploaded_m2)
+            if hasattr(obj, "n_features_in_") and obj.n_features_in_ == 18:
+                model_2 = obj
+                st.sidebar.success("Model 2 Loaded Successfully!")
+            else:
+                st.sidebar.error("Invalid Model 2 file. Expected LogisticRegression model with 18 features.")
 
-def extract_scalar(prediction_output):
-    """Safely extracts a scalar float from 0D, 1D, or 2D numpy arrays."""
-    arr = np.asarray(prediction_output)
-    return float(arr.ravel()[0])
-
-# Categorical Feature Options
+# Categorical Mappings
 JOB_TITLES = ["Data Analyst", "Data Scientist", "Machine Learning Engineer", "Data Engineer", "AI Architect"]
 COMPANY_SIZES = ["Small (1-50)", "Medium (51-500)", "Large (500+)"]
 INDUSTRIES = ["Technology", "Finance", "Healthcare", "E-commerce", "Consulting"]
@@ -166,14 +180,14 @@ EXPERIENCE_LEVELS = ["Entry-level", "Mid-level", "Senior-level", "Executive"]
 EDUCATION_LEVELS = ["Bachelor's", "Master's", "PhD", "Other"]
 
 # -----------------------------------------------------------------------------
-# 3. HEADER SECTION
+# HEADER
 # -----------------------------------------------------------------------------
 st.markdown('<h1 class="title-text">💼 AI Job Market & Salary Analytics</h1>', unsafe_allow_html=True)
 st.markdown('<p style="text-align: center; color: #94a3b8; font-size: 1.1rem;">Predict job compensation and classification using Machine Learning</p>', unsafe_allow_html=True)
 st.write("---")
 
 # -----------------------------------------------------------------------------
-# 4. SIDEBAR INPUT CONTROLS
+# SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
 st.sidebar.title("📌 Candidate & Job Inputs")
 
@@ -199,7 +213,7 @@ posting_year = st.sidebar.slider("Posting Year", 2020, 2026, 2025)
 hiring_urgency = st.sidebar.select_slider("Hiring Urgency Rating", options=[1, 2, 3, 4, 5], value=3)
 job_openings = st.sidebar.number_input("Open Positions Available", min_value=1, max_value=500, value=5)
 
-# Encode inputs into numpy feature vector matching Model 1 dimensions (17 features)
+# Construct Model 1 Feature Vector (17 features)
 m1_features = np.array([[
     JOB_TITLES.index(job_title),
     COMPANY_SIZES.index(company_size),
@@ -221,23 +235,23 @@ m1_features = np.array([[
 ]], dtype=object)
 
 # -----------------------------------------------------------------------------
-# 5. MAIN DASHBOARD TABS
+# TABS
 # -----------------------------------------------------------------------------
 tab1, tab2 = st.tabs(["💵 Model 1: Salary Regression", "📊 Model 2: Job Classification"])
 
-# -----------------------------------------------------------------------------
-# TAB 1: MODEL 1 (Linear Regression)
-# -----------------------------------------------------------------------------
+# TAB 1: MODEL 1
 with tab1:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("🔮 Estimated Annual Salary Prediction")
-    st.write("Model 1 uses **Linear Regression**[cite: 1] to estimate base compensation.")
+    st.write("Model 1 uses **Linear Regression** to estimate base compensation.")
     
     if st.button("🚀 Predict Salary (Model 1)", key="btn_model_1"):
         if model_1 is not None:
             try:
-                raw_prediction = model_1.predict(m1_features)
-                pred_val = abs(extract_scalar(raw_prediction))
+                pred = model_1.predict(m1_features)
+                # Safely extract scalar value from array
+                pred_val = float(np.ravel(pred)[0])
+                pred_val = abs(pred_val)
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -263,7 +277,6 @@ with tab1:
                     ''', unsafe_allow_html=True)
 
                 st.write("")
-                # Plotly Gauge Chart
                 fig = go.Figure(go.Indicator(
                     mode="gauge+number",
                     value=pred_val,
@@ -281,27 +294,21 @@ with tab1:
                         ],
                     }
                 ))
-                fig.update_layout(
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font={'color': "#e2e8f0"}
-                )
+                fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"})
                 st.plotly_chart(fig, use_container_width=True)
 
             except Exception as err:
                 st.error(f"Error executing Model 1 prediction: {err}")
         else:
-            st.error("Please upload or ensure 'Model_1 Job Analytics.pkl' exists in the project folder.")
+            st.error("Please upload 'Model_1 Job Analytics.pkl' under Upload Model 1 (.pkl) in the sidebar.")
             
     st.markdown('</div>', unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------
-# TAB 2: MODEL 2 (Logistic Regression)
-# -----------------------------------------------------------------------------
+# TAB 2: MODEL 2
 with tab2:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.subheader("🎯 Job Categorization & Classification")
-    st.write("Model 2 uses **Logistic Regression**[cite: 2] to analyze market positioning using profile metadata and salary benchmark.")
+    st.write("Model 2 uses **Logistic Regression** to analyze market positioning using profile metadata and target salary.")
 
     custom_salary = st.number_input(
         "Target Annual Salary ($) for Classification Input",
@@ -311,25 +318,24 @@ with tab2:
         step=5000
     )
 
-    # Insert salary at position 13 for Model 2 (18 features total)
+    # Insert salary at index 13 to create Model 2's 18-feature vector
     m2_features = np.insert(m1_features, 13, custom_salary).reshape(1, -1)
 
     if st.button("⚡ Classify Job Profile (Model 2)", key="btn_model_2"):
         if model_2 is not None:
             try:
-                raw_class_pred = model_2.predict(m2_features)
-                class_pred = extract_scalar(raw_class_pred)
+                class_pred = model_2.predict(m2_features)
+                class_val = np.ravel(class_pred)[0]
                 class_probs = model_2.predict_proba(m2_features)[0]
 
                 col1, col2 = st.columns([1, 2])
-                
                 with col1:
                     st.markdown(f'''
                         <div class="metric-box">
                             <div class="metric-label">Predicted Class</div>
-                            <div class="metric-value" style="color: #7f00ff;">Tier {int(class_pred)}</div>
+                            <div class="metric-value" style="color: #7f00ff;">Tier {class_val}</div>
                             <p style="color: #94a3b8; margin-top: 10px; font-size: 0.85rem;">
-                                Classified using parameters & salary target of ${custom_salary:,.0f}
+                                Classified using parameters & target salary of ${custom_salary:,.0f}
                             </p>
                         </div>
                     ''', unsafe_allow_html=True)
@@ -339,10 +345,7 @@ with tab2:
                     fig_bar = go.Figure(go.Bar(
                         x=classes,
                         y=class_probs,
-                        marker=dict(
-                            color=class_probs,
-                            colorscale='Viridis'
-                        )
+                        marker=dict(color=class_probs, colorscale='Viridis')
                     ))
                     fig_bar.update_layout(
                         title="Class Probability Distribution",
@@ -357,6 +360,6 @@ with tab2:
             except Exception as err:
                 st.error(f"Error executing Model 2 classification: {err}")
         else:
-            st.error("Please upload or ensure 'Model_2 job analytics.pkl' exists in the project folder.")
+            st.error("Please upload 'Model_2 job analytics.pkl' under Upload Model 2 (.pkl) in the sidebar.")
             
     st.markdown('</div>', unsafe_allow_html=True)
