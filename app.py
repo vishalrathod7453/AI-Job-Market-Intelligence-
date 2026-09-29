@@ -122,9 +122,9 @@ st.markdown("""
 @st.cache_resource
 def load_models():
     try:
-        with open("Model_1 Job Analytics.pkl", "wb") as f1:
+        with open("Model_1 Job Analytics.pkl", "rb") as f1:
             m1 = pickle.load(f1)
-        with open("Model_2 job analytics.pkl", "wb") as f2:
+        with open("Model_2 job analytics.pkl", "rb") as f2:
             m2 = pickle.load(f2)
         return m1, m2
     except FileNotFoundError as e:
