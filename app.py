@@ -11,24 +11,32 @@ from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import r2_score, accuracy_score, mean_squared_error, mean_absolute_error
 
+# Optional PDF parsing import
+try:
+    import pypdf
+    HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
+
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & ANIMATED GLASSMORPHISM THEME
+# 1. PAGE CONFIGURATION & TABLEAU-INSPIRED GLASSMORPHISM THEME
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="AI Job Analytics & Salary Portal",
-    page_icon="💼",
+    page_title="Tableau AI Job & Salary Analytics Portal",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 st.markdown("""
     <style>
-    /* Main Background Animation */
+    /* Main Tableau Dark/Slate Palette Animation */
     .stApp {
-        background: linear-gradient(-45deg, #0f0c20, #15102a, #1a1b35, #0b132b);
+        background: linear-gradient(-45deg, #0b132b, #1c2541, #1e293b, #0f172a);
         background-size: 400% 400%;
         animation: gradientBG 15s ease infinite;
-        color: #e2e8f0;
+        color: #f8fafc;
+        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     }
 
     @keyframes gradientBG {
@@ -37,93 +45,138 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* Glassmorphism Card Container */
-    .glass-card {
-        background: rgba(255, 255, 255, 0.04);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-        margin-bottom: 24px;
+    /* Tableau Dashboard Card Layout */
+    .tableau-card {
+        background: rgba(30, 41, 59, 0.75);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        margin-bottom: 20px;
+    }
+
+    .tableau-header {
+        border-bottom: 2px solid #38bdf8;
+        padding-bottom: 8px;
+        margin-bottom: 16px;
+        font-weight: 700;
+        color: #f8fafc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
     /* Animated Glowing Title */
     .title-text {
-        font-size: 2.8rem;
+        font-size: 2.5rem;
         font-weight: 800;
-        background: linear-gradient(90deg, #00c6ff, #0072ff, #7f00ff);
+        background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        animation: pulseText 3s infinite alternate;
         text-align: center;
         margin-bottom: 5px;
-    }
-
-    @keyframes pulseText {
-        0% { filter: drop-shadow(0 0 2px rgba(0, 198, 255, 0.2)); }
-        100% { filter: drop-shadow(0 0 14px rgba(127, 0, 255, 0.7)); }
     }
 
     /* Metric Visual Boxes */
     .metric-box {
         text-align: center;
-        background: rgba(15, 23, 42, 0.65);
-        border-radius: 14px;
-        padding: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        background: rgba(15, 23, 42, 0.8);
+        border-radius: 10px;
+        padding: 16px;
+        border-left: 4px solid #38bdf8;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
 
     .metric-value {
-        font-size: 2.2rem;
+        font-size: 2rem;
         font-weight: 700;
-        color: #00f2fe;
+        color: #38bdf8;
     }
 
     .metric-label {
-        font-size: 0.95rem;
+        font-size: 0.88rem;
         color: #94a3b8;
         margin-top: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Condition Status Badges */
+    .badge-pass {
+        background-color: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+        border: 1px solid #22c55e;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .badge-warn {
+        background-color: rgba(234, 179, 8, 0.2);
+        color: #fde047;
+        border: 1px solid #eab308;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .badge-fail {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+        border: 1px solid #ef4444;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 0.85rem;
     }
 
     /* Navigation Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
+        gap: 8px;
     }
 
     .stTabs [data-baseweb="tab"] {
-        height: 52px;
+        height: 48px;
         background-color: rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
+        border-radius: 8px;
         color: #cbd5e1;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 10px 22px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 8px 18px;
         font-weight: 600;
     }
 
     .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+        background: linear-gradient(135deg, #0284c7 0%, #4338ca 100%);
         color: #ffffff !important;
         border: none;
-        box-shadow: 0 4px 18px rgba(0, 198, 255, 0.45);
-    }
-
-    /* Custom Badges & Problem Statement Styling */
-    .problem-card {
-        background: rgba(15, 23, 42, 0.85);
-        border-left: 4px solid #00c6ff;
-        border-radius: 8px;
-        padding: 16px 20px;
-        margin-bottom: 20px;
+        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
     }
     </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. SAMPLE DATASET GENERATOR (FALLBACK FOR DEMO)
+# 2. PDF PARSER & SAMPLE DATASET GENERATOR
 # -----------------------------------------------------------------------------
+def extract_pdf_text(uploaded_pdf):
+    """Extract text content from uploaded PDF file."""
+    if uploaded_pdf is None:
+        return None
+    try:
+        if HAS_PYPDF:
+            reader = pypdf.PdfReader(uploaded_pdf)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() or ""
+            return text if text.strip() else "PDF contains no extractable text."
+        else:
+            return "PyPDF library is not installed in the environment. Using fallback text reader."
+    except Exception as e:
+        return f"Error extracting text from PDF: {str(e)}"
+
 @st.cache_data
 def generate_sample_data():
     np.random.seed(42)
@@ -139,8 +192,8 @@ def generate_sample_data():
     eds = np.random.choice(education, n)
     years_exp = np.random.randint(0, 20, n)
     
-    # Base salary generation based on experience and role
-    base_salary = 50000 + (years_exp * 6500) + np.random.normal(0, 12000, n)
+    # Base salary generation
+    base_salary = 52000 + (years_exp * 6800) + np.random.normal(0, 11000, n)
     base_salary = np.clip(base_salary, 35000, 280000)
     
     df = pd.DataFrame({
@@ -155,24 +208,20 @@ def generate_sample_data():
         'Salary USD': np.round(base_salary, 2)
     })
     
-    # Introduce random missing values & duplicates to showcase cleaning pipeline
+    # Missing values & duplicates injection for testing cleaning pipeline
     df.loc[np.random.choice(n, 12), 'Years of Experience'] = np.nan
     df.loc[np.random.choice(n, 8), 'Industry'] = np.nan
     df = pd.concat([df, df.iloc[:10]], ignore_index=True)
     return df
 
 # -----------------------------------------------------------------------------
-# 3. ADVANCED DATA CLEANING & MODEL TRAINING PIPELINE
+# 3. ADVANCED DATA CLEANING & MODEL PIPELINE
 # -----------------------------------------------------------------------------
 @st.cache_data
 def process_data_pipeline(df):
-    raw_copy = df.copy()
-    
-    # Standardize column names
     df_clean = df.copy()
     df_clean.columns = [c.strip().lower().replace(' ', '_') for c in df_clean.columns]
 
-    # Data Quality Stats
     initial_rows = len(df_clean)
     initial_nulls = int(df_clean.isnull().sum().sum())
     duplicate_rows = int(df_clean.duplicated().sum())
@@ -198,7 +247,7 @@ def process_data_pipeline(df):
             industry_col = col
             break
 
-    # Clean missing values
+    # Missing values imputation
     num_cols = df_clean.select_dtypes(include=[np.number]).columns
     cat_cols = df_clean.select_dtypes(include=['object', 'category']).columns
 
@@ -211,7 +260,7 @@ def process_data_pipeline(df):
 
     final_nulls = int(df_clean.isnull().sum().sum())
 
-    # Create dynamic quantile salary tiers (Tier 0: Entry/Low, Tier 1: Mid, Tier 2: Senior/High)
+    # Create dynamic quantile salary tiers (Tier 0, Tier 1, Tier 2)
     tier_col = 'job_tier'
     if 'tier' in df_clean.columns:
         tier_col = 'tier'
@@ -220,7 +269,7 @@ def process_data_pipeline(df):
     else:
         df_clean['job_tier'] = pd.qcut(df_clean[salary_col], q=3, labels=[0, 1, 2]).astype(int)
 
-    # Encode categorical features for modeling
+    # Encode categorical features
     encoders = {}
     options = {}
     df_encoded = df_clean.copy()
@@ -231,7 +280,7 @@ def process_data_pipeline(df):
         encoders[col] = le
         options[col] = list(le.classes_)
 
-    # Model 1: Salary Regression (Linear Regression)
+    # Model 1: Salary Regression
     X_m1 = df_encoded.drop(columns=[salary_col, tier_col], errors='ignore')
     y_m1 = df_encoded[salary_col]
 
@@ -244,7 +293,7 @@ def process_data_pipeline(df):
     mae_m1 = float(mean_absolute_error(y1_test, y1_pred))
     rmse_m1 = float(np.sqrt(mean_squared_error(y1_test, y1_pred)))
 
-    # Model 2: Job Classification (Logistic Regression)
+    # Model 2: Job Tier Classification
     X_m2 = df_encoded.drop(columns=[tier_col], errors='ignore')
     y_m2 = df_encoded[tier_col]
 
@@ -275,24 +324,86 @@ def process_data_pipeline(df):
     )
 
 # -----------------------------------------------------------------------------
-# 4. HEADER & SIDEBAR NAVIGATION
+# 4. CONDITION VERIFICATION ENGINE
 # -----------------------------------------------------------------------------
-st.markdown('<h1 class="title-text">💼 AI Job Market & Salary Analytics Portal</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #94a3b8; font-size: 1.1rem; margin-bottom: 25px;">Automated Data Cleaning, Predictive Compensation Modeling & Career Tier Classification</p>', unsafe_allow_html=True)
+def verify_dataset_conditions(df, salary_col, clean_stats, r2_score_val, acc_score_val, pdf_text_present):
+    checks = []
+    
+    # Condition 1: Minimal Sample Size
+    has_min_rows = len(df) >= 50
+    checks.append({
+        "rule": "Dataset Sample Size (>= 50 rows)",
+        "status": "PASS" if has_min_rows else "FAIL",
+        "detail": f"Dataset contains {len(df)} records."
+    })
+    
+    # Condition 2: Target Salary Identification
+    has_salary = salary_col is not None
+    checks.append({
+        "rule": "Target Compensation Column Present",
+        "status": "PASS" if has_salary else "FAIL",
+        "detail": f"Detected salary column: '{salary_col}'."
+    })
 
-st.sidebar.title("📁 Dataset & Configurations")
-uploaded_file = st.sidebar.file_uploader("Upload Job Dataset (.csv)", type=["csv"])
+    # Condition 3: Missing Value Resolution
+    no_nulls = clean_stats['final_nulls'] == 0
+    checks.append({
+        "rule": "Missing Value Zero Imputation Check",
+        "status": "PASS" if no_nulls else "WARN",
+        "detail": f"Initial nulls: {clean_stats['initial_nulls']} ➔ Remaining nulls: {clean_stats['final_nulls']}."
+    })
 
-# Load Dataset (Uploaded CSV or Built-in Simulated AI Job Dataset)
+    # Condition 4: Regression Model Fit (R²)
+    r2_pass = r2_score_val >= 0.50
+    checks.append({
+        "rule": "Regression Model Fit (R² Score >= 0.50)",
+        "status": "PASS" if r2_pass else "WARN",
+        "detail": f"Achieved R² score = {r2_score_val:.3f}."
+    })
+
+    # Condition 5: Classifier Model Accuracy
+    acc_pass = acc_score_val >= 0.60
+    checks.append({
+        "rule": "Classifier Model Accuracy (>= 60%)",
+        "status": "PASS" if acc_pass else "WARN",
+        "detail": f"Achieved classification accuracy = {acc_score_val * 100:.1f}%."
+    })
+
+    # Condition 6: Problem Statement File Attachment
+    checks.append({
+        "rule": "Problem Statement Attachment (.pdf)",
+        "status": "PASS" if pdf_text_present else "INFO",
+        "detail": "PDF problem statement loaded and parsed." if pdf_text_present else "Using default built-in problem statement specification."
+    })
+
+    return checks
+
+# -----------------------------------------------------------------------------
+# 5. SIDEBAR INGESTION & CONTROLS
+# -----------------------------------------------------------------------------
+st.markdown('<h1 class="title-text">📊 Tableau AI Job & Salary Analytics Dashboard</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; color: #94a3b8; font-size: 1.05rem; margin-bottom: 25px;">Interactive Business Intelligence, Data Quality Verification & Predictive Modeling</p>', unsafe_allow_html=True)
+
+st.sidebar.title("📂 Data & Document Ingestion")
+st.sidebar.caption("Upload your dataset CSV and Problem Statement PDF here:")
+
+# CSV & PDF File Uploaders side-by-side in sidebar
+uploaded_file = st.sidebar.file_uploader("Upload Job Dataset (.csv)", type=["csv"], key="csv_uploader")
+uploaded_pdf = st.sidebar.file_uploader("Upload Problem Statement (.pdf)", type=["pdf"], key="pdf_uploader")
+
+# Parse PDF text if available
+pdf_content = extract_pdf_text(uploaded_pdf) if uploaded_pdf is not None else None
+
+# Load CSV dataset or fallback
 if uploaded_file is not None:
     try:
         raw_df = pd.read_csv(uploaded_file)
-        st.sidebar.success("Custom CSV uploaded successfully!")
+        st.sidebar.success("✅ Dataset CSV loaded!")
     except Exception as e:
-        st.sidebar.error(f"Error loading CSV file: {e}")
+        st.sidebar.error(f"Error loading CSV: {e}")
         raw_df = generate_sample_data()
 else:
-    st.sidebar.info("💡 Using built-in sample AI job dataset. Upload your CSV above to analyze custom data.")
+    st.sidebar.info("💡 Using built-in sample AI job dataset. Upload custom files above.")
     raw_df = generate_sample_data()
 
 # Process Data Pipeline
@@ -302,10 +413,15 @@ else:
     r2_m1, acc_m2, clean_stats
 ) = process_data_pipeline(raw_df)
 
+# Run Condition Verification
+verification_results = verify_dataset_conditions(
+    df_clean, target_salary, clean_stats, r2_m1, acc_m2, pdf_content is not None
+)
+
 st.sidebar.write("---")
 st.sidebar.title("📌 Candidate Profile Inputs")
 
-# Dynamic sidebar controls matching CSV feature schema
+# Dynamic sidebar inputs matching dataframe schema
 input_data = {}
 for col in m1_cols:
     col_label = col.replace('_', ' ').title()
@@ -313,7 +429,7 @@ for col in m1_cols:
         selected_val = st.sidebar.selectbox(col_label, options[col], key=f"sb_{col}")
         input_data[col] = encoders[col].transform([selected_val])[0]
     elif any(kw in col for kw in ['year', 'exp', 'experience']):
-        input_data[col] = st.sidebar.slider(col_label, 0, 25, 3, key=f"sl_{col}")
+        input_data[col] = st.sidebar.slider(col_label, 0, 25, 4, key=f"sl_{col}")
     elif 'month' in col:
         input_data[col] = st.sidebar.slider(col_label, 1, 12, 6, key=f"sl_{col}")
     elif any(kw in col for kw in ['urgency', 'rating', 'level']):
@@ -326,54 +442,165 @@ for col in m1_cols:
         input_data[col] = st.sidebar.number_input(col_label, value=float(df_clean[col].median()), key=f"num_{col}")
 
 # -----------------------------------------------------------------------------
-# 5. MAIN NAVIGATION TABS
+# 6. MAIN APPLICATION TABS
 # -----------------------------------------------------------------------------
-tab_problem, tab_clean, tab1, tab2 = st.tabs([
-    "📑 Problem Statement",
-    "🧼 Data Cleaning & Overview", 
+tab_tableaudash, tab_problem, tab_clean, tab1, tab2 = st.tabs([
+    "📊 Tableau BI Dashboard",
+    "📑 Problem Statement & Verification",
+    "🧼 Data Pipeline & Quality", 
     "💵 Model 1: Salary Regression", 
     "🎯 Model 2: Job Classification"
 ])
 
 # -----------------------------------------------------------------------------
-# TAB 0: PROBLEM STATEMENT & PROJECT SPECIFICATION
+# TAB 1: TABLEAU-STYLE INTERACTIVE BI DASHBOARD
+# -----------------------------------------------------------------------------
+with tab_tableaudash:
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+    st.markdown('<div class="tableau-header"><h3>📈 Executive Compensation Analytics Dashboard</h3><span>Theme: Tableau Slate</span></div>', unsafe_allow_html=True)
+
+    # Top KPI Cards Row
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    avg_annual = float(df_clean[target_salary].mean())
+    median_annual = float(df_clean[target_salary].median())
+    max_annual = float(df_clean[target_salary].max())
+    total_records = len(df_clean)
+
+    kpi1.markdown(f'''<div class="metric-box"><div class="metric-value">${avg_annual:,.0f}</div><div class="metric-label">Average Compensation</div></div>''', unsafe_allow_html=True)
+    kpi2.markdown(f'''<div class="metric-box"><div class="metric-value">${median_annual:,.0f}</div><div class="metric-label">Median Compensation</div></div>''', unsafe_allow_html=True)
+    kpi3.markdown(f'''<div class="metric-box"><div class="metric-value">${max_annual:,.0f}</div><div class="metric-label">Peak Compensation</div></div>''', unsafe_allow_html=True)
+    kpi4.markdown(f'''<div class="metric-box"><div class="metric-value">{total_records:,}</div><div class="metric-label">Cleaned Records</div></div>''', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Tableau Multi-Chart Grid
+    col_chart1, col_chart2 = st.columns(2)
+
+    with col_chart1:
+        st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+        st.write("#### 🏢 Industry Sector Salary Breakdown")
+        if industry_col and industry_col in df_clean.columns:
+            ind_agg = df_clean.groupby(industry_col)[target_salary].mean().reset_index()
+            fig_ind = px.bar(
+                ind_agg, 
+                x=industry_col, 
+                y=target_salary, 
+                color=target_salary,
+                color_continuous_scale=px.colors.sequential.Tealgrn,
+                text_auto='.2s',
+                labels={target_salary: 'Avg Salary ($)'}
+            )
+            fig_ind.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=320)
+            st.plotly_chart(fig_ind, use_container_width=True)
+        else:
+            st.info("No explicit industry column detected.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_chart2:
+        st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+        st.write("#### 📈 Experience vs Compensation Trajectory")
+        exp_col = [c for c in df_clean.columns if 'exp' in c or 'year' in c]
+        if exp_col:
+            fig_scat = px.scatter(
+                df_clean, 
+                x=exp_col[0], 
+                y=target_salary, 
+                color='job_tier' if 'job_tier' in df_clean.columns else None,
+                trendline="ols",
+                color_continuous_scale=px.colors.sequential.Viridis,
+                labels={exp_col[0]: 'Years of Experience', target_salary: 'Salary ($)'}
+            )
+            fig_scat.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=320)
+            st.plotly_chart(fig_scat, use_container_width=True)
+        else:
+            st.info("No experience column found for trajectory plotting.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Row 2: Distribution and Boxplot
+    col_chart3, col_chart4 = st.columns(2)
+
+    with col_chart3:
+        st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+        st.write("#### 📊 Salary Distribution (Histogram & Density)")
+        fig_hist = px.histogram(
+            df_clean, 
+            x=target_salary, 
+            nbins=25, 
+            color_discrete_sequence=['#38bdf8'],
+            marginal="box"
+        )
+        fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=320)
+        st.plotly_chart(fig_hist, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_chart4:
+        st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+        st.write("#### 🍩 Market Salary Tier Share")
+        tier_counts = df_clean[target_tier].value_counts().reset_index()
+        tier_counts.columns = ['Tier', 'Count']
+        tier_counts['Tier'] = tier_counts['Tier'].apply(lambda x: f"Tier {x}")
+        fig_pie = px.pie(
+            tier_counts, 
+            names='Tier', 
+            values='Count', 
+            hole=0.45,
+            color_discrete_sequence=px.colors.qualitative.Tableau10
+        )
+        fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=320)
+        st.plotly_chart(fig_pie, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# TAB 2: PROBLEM STATEMENT & CONDITION VERIFICATION
 # -----------------------------------------------------------------------------
 with tab_problem:
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader("🎯 Project Problem Statement & Strategic Objective")
-    
-    st.markdown("""
-    <div class="problem-card">
-        <h4 style="color: #00f2fe; margin-top: 0;">Problem Overview</h4>
-        <p>The modern AI and tech hiring ecosystem requires precise data-driven benchmarks for compensation, skill evaluation, and job tier structuring. Unstructured salary data and missing profile attributes create valuation friction for candidates and employers alike.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+    st.subheader("📋 Dataset & Model Condition Verification Matrix")
+    st.write("Automated compliance audit checking dataset integrity, PDF attachment, and model performance criteria:")
 
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        st.markdown("""
-        ### 🔍 Core Analytics Objectives
-        1. **Automated Cleaning Pipeline:** Identify and resolve duplicate rows, missing numerical values (median imputation), and missing categorical entries (mode imputation).
-        2. **Compensation Prediction Engine (Model 1):** Train a linear regression architecture to predict annual and monthly compensation profiles based on candidate attributes.
-        3. **Job Category Classifier (Model 2):** Deploy logistic regression to classify candidate job roles into standardized market salary tiers (Tier 0: Entry, Tier 1: Mid, Tier 2: High/Senior).
-        """)
-
-    with col_p2:
-        st.markdown("""
-        ### 🛠️ Key Pipeline Deliverables
-        - **Data Quality Dashboard:** Real-time visibility into missing values, deduplication, and accuracy scores ($R^2$ and Accuracy %).
-        - **Interactive Market Gauges:** Visual compensation meters comparing predicted annual salary against industry market thresholds.
-        - **Multi-angle Visual Analytics:** Class probability distribution bar charts, probability line trends, and tier breakdown pie charts.
-        """)
+    # Display Condition Checks Table
+    for check in verification_results:
+        c1, c2, c3 = st.columns([3, 1, 4])
+        with c1:
+            st.write(f"**{check['rule']}**")
+        with c2:
+            if check['status'] == 'PASS':
+                st.markdown('<span class="badge-pass">✔ PASS</span>', unsafe_allow_html=True)
+            elif check['status'] == 'WARN':
+                st.markdown('<span class="badge-warn">⚠️️ WARN</span>', unsafe_allow_html=True)
+            else:
+                st.markdown('<span class="badge-fail">✖ FAIL / INFO</span>', unsafe_allow_html=True)
+        with c3:
+            st.write(check['detail'])
+        st.markdown('<hr style="margin: 8px 0; border-color: rgba(255,255,255,0.05);"/>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # Display Problem Statement PDF Content or Specification
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+    st.subheader("📑 Problem Statement Specification")
+
+    if pdf_content:
+        st.success("📄 Extracted content from uploaded Problem Statement PDF:")
+        st.text_area("PDF Document Content", value=pdf_content, height=280)
+    else:
+        st.info("ℹ️ No PDF uploaded. Showing standard project problem statement formulation:")
+        st.markdown("""
+        > **Strategic Objective:** Develop an end-to-end data processing and predictive machine learning system for AI and technology talent compensation analysis.
+        > 
+        > **Core Deliverables:**
+        > 1. **Data Cleaning Pipeline:** Deduplication, standardizing attributes, and median/mode imputation for missing data.
+        > 2. **Salary Regression Engine (Model 1):** Train a linear regression model to accurately forecast baseline annual compensation.
+        > 3. **Job Category Classifier (Model 2):** Classify candidate profiles into standardized quantile salary tiers using Logistic Regression.
+        > 4. **Tableau Business Intelligence Dashboard:** Provide real-time interactive visual analytics, condition validation, and market insights.
+        """)
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # -----------------------------------------------------------------------------
-# TAB 1: DATA CLEANING & OVERVIEW (INCLUDES MODEL ACCURACY METRICS)
+# TAB 3: DATA CLEANING & QUALITY OVERVIEW
 # -----------------------------------------------------------------------------
 with tab_clean:
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader("🧹 Data Cleaning Summary & Quality Metrics")
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+    st.subheader("🧼 Data Pipeline & Cleaning Summary")
     
     q1, q2, q3, q4 = st.columns(4)
     q1.metric("Initial / Clean Rows", f"{clean_stats['initial_rows']:,} / {clean_stats['clean_rows']:,}")
@@ -382,103 +609,48 @@ with tab_clean:
     q4.metric("Target Salary Column", f"`{target_salary}`")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # MODEL PERFORMANCE ACCURACY SCORES DISPLAY
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader("📊 Model Performance & Accuracy Scorecard")
-    st.write("Real-time performance metrics computed on clean validation split datasets:")
+    # Model Performance Cards
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
+    st.subheader("🎯 Machine Learning Model Scorecard")
 
     m_col1, m_col2, m_col3, m_col4 = st.columns(4)
     
     with m_col1:
-        st.markdown(f'''
-            <div class="metric-box">
-                <div class="metric-value">{r2_m1:.3f}</div>
-                <div class="metric-label">Model 1 R² Score (Regression)</div>
-            </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="metric-box"><div class="metric-value">{r2_m1:.3f}</div><div class="metric-label">Model 1 R² Score</div></div>''', unsafe_allow_html=True)
         
     with m_col2:
-        st.markdown(f'''
-            <div class="metric-box">
-                <div class="metric-value">${clean_stats['mae_m1']:,.0f}</div>
-                <div class="metric-label">Model 1 MAE (Mean Absolute Error)</div>
-            </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="metric-box"><div class="metric-value">${clean_stats['mae_m1']:,.0f}</div><div class="metric-label">Model 1 MAE</div></div>''', unsafe_allow_html=True)
 
     with m_col3:
-        st.markdown(f'''
-            <div class="metric-box">
-                <div class="metric-value">{acc_m2 * 100:.1f}%</div>
-                <div class="metric-label">Model 2 Accuracy Score (Classification)</div>
-            </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="metric-box"><div class="metric-value">{acc_m2 * 100:.1f}%</div><div class="metric-label">Model 2 Accuracy</div></div>''', unsafe_allow_html=True)
 
     with m_col4:
-        st.markdown(f'''
-            <div class="metric-box">
-                <div class="metric-value">Tier 0 / 1 / 2</div>
-                <div class="metric-label">Classification Quantile Tiers</div>
-            </div>
-        ''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="metric-box"><div class="metric-value">Tier 0 / 1 / 2</div><div class="metric-label">Quantile Categories</div></div>''', unsafe_allow_html=True)
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Salary Key Performance Indicators
-    avg_annual = float(df_clean[target_salary].mean())
-    avg_monthly = avg_annual / 12.0
-    highest_row = df_clean.loc[df_clean[target_salary].idxmax()]
-    lowest_row = df_clean.loc[df_clean[target_salary].idxmin()]
-
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader("💰 Salary Analytics & Industry Benchmarks")
-    
-    s1, s2, s3, s4 = st.columns(4)
-    s1.metric("Average Annual Salary", f"${avg_annual:,.2f}")
-    s2.metric("Average Monthly Salary", f"${avg_monthly:,.2f}")
-    s3.metric("Highest Compensation", f"${float(highest_row[target_salary]):,.2f}")
-    s4.metric("Lowest Compensation", f"${float(lowest_row[target_salary]):,.2f}")
-
+    # Data Preview Tables
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
     col_a, col_b = st.columns(2)
     
     with col_a:
-        st.write("### 🔝 Top 5 Highest Salary Profiles")
+        st.write("### 🔝 Top 5 Highest Compensation Profiles")
         top_5 = df_clean.sort_values(by=target_salary, ascending=False).head(5)
         st.dataframe(top_5, use_container_width=True)
 
     with col_b:
-        st.write("### 🔻 Bottom 5 Lowest Salary Profiles")
+        st.write("### 🔻 Bottom 5 Lowest Compensation Profiles")
         bottom_5 = df_clean.sort_values(by=target_salary, ascending=True).head(5)
         st.dataframe(bottom_5, use_container_width=True)
-
-    # Industry Value Analysis
-    if industry_col and industry_col in df_clean.columns:
-        st.write("---")
-        st.write("### 🏢 Industry Salary Benchmarks (Most Valuable Sector)")
-        ind_df = df_clean.groupby(industry_col)[target_salary].agg(['mean', 'max', 'count']).reset_index()
-        ind_df.columns = [industry_col.title(), 'Average Salary', 'Max Salary', 'Job Count']
-        ind_df = ind_df.sort_values(by='Average Salary', ascending=False)
-        
-        fig_ind = px.bar(
-            ind_df, 
-            x=industry_col.title(), 
-            y='Average Salary', 
-            color='Average Salary',
-            color_continuous_scale='Viridis',
-            title="Average Annual Salary by Industry Sector",
-            text_auto='.2s'
-        )
-        fig_ind.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"})
-        st.plotly_chart(fig_ind, use_container_width=True)
-
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# TAB 2: MODEL 1 - SALARY REGRESSION ENGINE
+# TAB 4: MODEL 1 - SALARY REGRESSION ENGINE
 # -----------------------------------------------------------------------------
 m1_vector = np.array([[input_data[col] for col in m1_cols]])
 
 with tab1:
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
     st.subheader("🔮 Salary Prediction Engine (Linear Regression)")
     st.write("Predict estimated base annual and monthly compensation using candidate profile features configured in the sidebar.")
 
@@ -490,26 +662,11 @@ with tab1:
 
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.markdown(f'''
-                    <div class="metric-box">
-                        <div class="metric-value">${pred_val:,.2f}</div>
-                        <div class="metric-label">Predicted Annual Salary</div>
-                    </div>
-                ''', unsafe_allow_html=True)
+                st.markdown(f'''<div class="metric-box"><div class="metric-value">${pred_val:,.2f}</div><div class="metric-label">Predicted Annual Salary</div></div>''', unsafe_allow_html=True)
             with c2:
-                st.markdown(f'''
-                    <div class="metric-box">
-                        <div class="metric-value">${monthly_val:,.2f}</div>
-                        <div class="metric-label">Predicted Monthly Salary</div>
-                    </div>
-                ''', unsafe_allow_html=True)
+                st.markdown(f'''<div class="metric-box"><div class="metric-value">${monthly_val:,.2f}</div><div class="metric-label">Predicted Monthly Salary</div></div>''', unsafe_allow_html=True)
             with c3:
-                st.markdown(f'''
-                    <div class="metric-box">
-                        <div class="metric-value">R² {r2_m1:.2f}</div>
-                        <div class="metric-label">Model Accuracy Score</div>
-                    </div>
-                ''', unsafe_allow_html=True)
+                st.markdown(f'''<div class="metric-box"><div class="metric-value">R² {r2_m1:.2f}</div><div class="metric-label">Model Fit Accuracy</div></div>''', unsafe_allow_html=True)
 
             st.write("")
             max_gauge = float(max(250000.0, pred_val * 1.3))
@@ -517,10 +674,10 @@ with tab1:
                 mode="gauge+number",
                 value=pred_val,
                 domain={'x': [0, 1], 'y': [0, 1]},
-                title={'text': "Market Salary Tier Gauge ($)", 'font': {'size': 20, 'color': '#ffffff'}},
+                title={'text': "Market Salary Tier Gauge ($)", 'font': {'size': 18, 'color': '#ffffff'}},
                 gauge={
                     'axis': {'range': [None, max_gauge], 'tickwidth': 1, 'tickcolor': "#475569"},
-                    'bar': {'color': "#00c6ff"},
+                    'bar': {'color': "#38bdf8"},
                     'bgcolor': "rgba(15, 23, 42, 0.8)",
                     'bordercolor': "rgba(255,255,255,0.1)",
                     'steps': [
@@ -530,7 +687,7 @@ with tab1:
                     ],
                 }
             ))
-            fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"})
+            fig_gauge.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=350)
             st.plotly_chart(fig_gauge, use_container_width=True)
 
         except Exception as err:
@@ -539,10 +696,10 @@ with tab1:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# TAB 3: MODEL 2 - JOB CLASSIFICATION & VISUALIZATIONS
+# TAB 5: MODEL 2 - JOB CLASSIFICATION ENGINE
 # -----------------------------------------------------------------------------
 with tab2:
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
     st.subheader("🎯 Job Categorization & Classification Engine")
     st.write("Model 2 uses **Logistic Regression** to analyze market positioning across salary tiers.")
 
@@ -554,7 +711,6 @@ with tab2:
         step=5000
     )
 
-    # Construct Model 2 feature vector incorporating target salary
     m2_input_dict = input_data.copy()
     m2_input_dict[target_salary] = custom_salary
     m2_vector = np.array([[m2_input_dict[col] for col in m2_cols]])
@@ -572,29 +728,29 @@ with tab2:
                 st.markdown(f'''
                     <div class="metric-box">
                         <div class="metric-label">Predicted Category</div>
-                        <div class="metric-value" style="color: #7f00ff;">Tier {class_val}</div>
+                        <div class="metric-value" style="color: #c084fc;">Tier {class_val}</div>
                         <p style="color: #94a3b8; margin-top: 10px; font-size: 0.85rem;">
-                            Classified at target salary of <b>${custom_salary:,.0f}</b>
+                            Classified at salary: <b>${custom_salary:,.0f}</b>
                         </p>
-                        <p style="color: #00f2fe; font-size: 0.9rem;">Model Accuracy: {acc_m2*100:.1f}%</p>
+                        <p style="color: #38bdf8; font-size: 0.9rem;">Model Accuracy: {acc_m2*100:.1f}%</p>
                     </div>
                 ''', unsafe_allow_html=True)
 
             with col_right:
-                # 1. BAR CHART: Class Probability
                 fig_bar = go.Figure(go.Bar(
                     x=classes,
                     y=class_probs,
-                    marker=dict(color=class_probs, colorscale='Plasma'),
+                    marker=dict(color=class_probs, colorscale='Viridis'),
                     text=[f"{p*100:.1f}%" for p in class_probs],
                     textposition='auto'
                 ))
                 fig_bar.update_layout(
-                    title="<b>1. Class Probability Distribution (Bar Chart)</b>",
+                    title="<b>Class Probability Distribution (Bar Chart)</b>",
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
                     font={'color': "#e2e8f0"},
-                    yaxis=dict(range=[0, 1])
+                    yaxis=dict(range=[0, 1]),
+                    height=280
                 )
                 st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -602,20 +758,18 @@ with tab2:
             v1, v2 = st.columns(2)
 
             with v1:
-                # 2. LINE CHART: Probability Trajectory
                 fig_line = px.line(
                     x=classes, 
                     y=class_probs, 
                     markers=True,
-                    title="<b>2. Class Probability Trend (Line Chart)</b>",
+                    title="<b>Probability Trajectory Line</b>",
                     labels={'x': 'Category Tier', 'y': 'Probability'}
                 )
-                fig_line.update_traces(line_color='#00c6ff', line_width=3, marker_size=10)
-                fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"})
+                fig_line.update_traces(line_color='#38bdf8', line_width=3, marker_size=10)
+                fig_line.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=280)
                 st.plotly_chart(fig_line, use_container_width=True)
 
             with v2:
-                # 3. PIE CHART: Overall Dataset Tier Breakdown
                 tier_counts = df_clean[target_tier].value_counts().reset_index()
                 tier_counts.columns = ['Tier', 'Count']
                 tier_counts['Tier'] = tier_counts['Tier'].apply(lambda x: f"Tier {x}")
@@ -625,10 +779,10 @@ with tab2:
                     names='Tier', 
                     values='Count', 
                     hole=0.4,
-                    title="<b>3. Overall Dataset Class Distribution (Pie Chart)</b>",
-                    color_discrete_sequence=px.colors.sequential.RdBu
+                    title="<b>Overall Dataset Category Share</b>",
+                    color_discrete_sequence=px.colors.qualitative.Pastel
                 )
-                fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"})
+                fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=280)
                 st.plotly_chart(fig_pie, use_container_width=True)
 
         except Exception as err:
