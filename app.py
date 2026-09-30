@@ -467,7 +467,6 @@ with tab_tableaudash:
         st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
         st.write("#### 📈 Experience vs Compensation Trajectory")
         
-        # STRICT BUG FIX: Only select strictly NUMERIC experience columns to prevent OLS string error
         numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
         num_exp_cols = [c for c in numeric_cols if any(kw in c for kw in ['year', 'exp', 'years_of_experience']) and c != target_salary]
         
@@ -516,7 +515,7 @@ with tab_tableaudash:
             names='Tier', 
             values='Count', 
             hole=0.45,
-            color_discrete_sequence=px.colors.qualitative.Tableau10
+            color_discrete_sequence=px.colors.qualitative.T10  # FIXED: T10 instead of Tableau10
         )
         fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=320)
         st.plotly_chart(fig_pie, use_container_width=True)
