@@ -11,7 +11,6 @@ from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import r2_score, accuracy_score, mean_squared_error, mean_absolute_error
 
-# Optional PDF parsing import
 try:
     import pypdf
     HAS_PYPDF = True
@@ -30,7 +29,6 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    /* Main Tableau Dark/Slate Palette Animation */
     .stApp {
         background: linear-gradient(-45deg, #0b132b, #1c2541, #1e293b, #0f172a);
         background-size: 400% 400%;
@@ -45,7 +43,6 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* Tableau Dashboard Card Layout */
     .tableau-card {
         background: rgba(30, 41, 59, 0.75);
         backdrop-filter: blur(12px);
@@ -68,7 +65,6 @@ st.markdown("""
         align-items: center;
     }
 
-    /* Animated Glowing Title */
     .title-text {
         font-size: 2.5rem;
         font-weight: 800;
@@ -79,7 +75,6 @@ st.markdown("""
         margin-bottom: 5px;
     }
 
-    /* Metric Visual Boxes */
     .metric-box {
         text-align: center;
         background: rgba(15, 23, 42, 0.8);
@@ -103,7 +98,6 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
 
-    /* Condition Status Badges */
     .badge-pass {
         background-color: rgba(34, 197, 94, 0.2);
         color: #4ade80;
@@ -134,7 +128,6 @@ st.markdown("""
         font-size: 0.85rem;
     }
 
-    /* Navigation Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
     }
@@ -162,7 +155,6 @@ st.markdown("""
 # 2. PDF PARSER & SAMPLE DATASET GENERATOR
 # -----------------------------------------------------------------------------
 def extract_pdf_text(uploaded_pdf):
-    """Extract text content from uploaded PDF file."""
     if uploaded_pdf is None:
         return None
     try:
@@ -173,7 +165,7 @@ def extract_pdf_text(uploaded_pdf):
                 text += page.extract_text() or ""
             return text if text.strip() else "PDF contains no extractable text."
         else:
-            return "PyPDF library is not installed in the environment. Using fallback text reader."
+            return "PyPDF library is not installed in the environment."
     except Exception as e:
         return f"Error extracting text from PDF: {str(e)}"
 
@@ -192,7 +184,6 @@ def generate_sample_data():
     eds = np.random.choice(education, n)
     years_exp = np.random.randint(0, 20, n)
     
-    # Base salary generation
     base_salary = 52000 + (years_exp * 6800) + np.random.normal(0, 11000, n)
     base_salary = np.clip(base_salary, 35000, 280000)
     
@@ -208,7 +199,6 @@ def generate_sample_data():
         'Salary USD': np.round(base_salary, 2)
     })
     
-    # Missing values & duplicates injection for testing cleaning pipeline
     df.loc[np.random.choice(n, 12), 'Years of Experience'] = np.nan
     df.loc[np.random.choice(n, 8), 'Industry'] = np.nan
     df = pd.concat([df, df.iloc[:10]], ignore_index=True)
@@ -226,10 +216,8 @@ def process_data_pipeline(df):
     initial_nulls = int(df_clean.isnull().sum().sum())
     duplicate_rows = int(df_clean.duplicated().sum())
     
-    # Remove duplicate records
     df_clean = df_clean.drop_duplicates().reset_index(drop=True)
 
-    # Detect salary target column
     salary_col = None
     for col in df_clean.columns:
         if any(kw in col for kw in ['salary', 'compensation', 'pay', 'usd']):
@@ -240,14 +228,12 @@ def process_data_pipeline(df):
         num_cols = df_clean.select_dtypes(include=[np.number]).columns
         salary_col = num_cols[0] if len(num_cols) > 0 else df_clean.columns[-1]
 
-    # Detect industry column
     industry_col = None
     for col in df_clean.columns:
         if any(kw in col for kw in ['industry', 'sector', 'domain', 'field']):
             industry_col = col
             break
 
-    # Missing values imputation
     num_cols = df_clean.select_dtypes(include=[np.number]).columns
     cat_cols = df_clean.select_dtypes(include=['object', 'category']).columns
 
@@ -260,7 +246,6 @@ def process_data_pipeline(df):
 
     final_nulls = int(df_clean.isnull().sum().sum())
 
-    # Create dynamic quantile salary tiers (Tier 0, Tier 1, Tier 2)
     tier_col = 'job_tier'
     if 'tier' in df_clean.columns:
         tier_col = 'tier'
@@ -269,7 +254,6 @@ def process_data_pipeline(df):
     else:
         df_clean['job_tier'] = pd.qcut(df_clean[salary_col], q=3, labels=[0, 1, 2]).astype(int)
 
-    # Encode categorical features
     encoders = {}
     options = {}
     df_encoded = df_clean.copy()
@@ -280,7 +264,6 @@ def process_data_pipeline(df):
         encoders[col] = le
         options[col] = list(le.classes_)
 
-    # Model 1: Salary Regression
     X_m1 = df_encoded.drop(columns=[salary_col, tier_col], errors='ignore')
     y_m1 = df_encoded[salary_col]
 
@@ -293,7 +276,6 @@ def process_data_pipeline(df):
     mae_m1 = float(mean_absolute_error(y1_test, y1_pred))
     rmse_m1 = float(np.sqrt(mean_squared_error(y1_test, y1_pred)))
 
-    # Model 2: Job Tier Classification
     X_m2 = df_encoded.drop(columns=[tier_col], errors='ignore')
     y_m2 = df_encoded[tier_col]
 
@@ -329,7 +311,6 @@ def process_data_pipeline(df):
 def verify_dataset_conditions(df, salary_col, clean_stats, r2_score_val, acc_score_val, pdf_text_present):
     checks = []
     
-    # Condition 1: Minimal Sample Size
     has_min_rows = len(df) >= 50
     checks.append({
         "rule": "Dataset Sample Size (>= 50 rows)",
@@ -337,7 +318,6 @@ def verify_dataset_conditions(df, salary_col, clean_stats, r2_score_val, acc_sco
         "detail": f"Dataset contains {len(df)} records."
     })
     
-    # Condition 2: Target Salary Identification
     has_salary = salary_col is not None
     checks.append({
         "rule": "Target Compensation Column Present",
@@ -345,7 +325,6 @@ def verify_dataset_conditions(df, salary_col, clean_stats, r2_score_val, acc_sco
         "detail": f"Detected salary column: '{salary_col}'."
     })
 
-    # Condition 3: Missing Value Resolution
     no_nulls = clean_stats['final_nulls'] == 0
     checks.append({
         "rule": "Missing Value Zero Imputation Check",
@@ -353,7 +332,6 @@ def verify_dataset_conditions(df, salary_col, clean_stats, r2_score_val, acc_sco
         "detail": f"Initial nulls: {clean_stats['initial_nulls']} ➔ Remaining nulls: {clean_stats['final_nulls']}."
     })
 
-    # Condition 4: Regression Model Fit (R²)
     r2_pass = r2_score_val >= 0.50
     checks.append({
         "rule": "Regression Model Fit (R² Score >= 0.50)",
@@ -361,7 +339,6 @@ def verify_dataset_conditions(df, salary_col, clean_stats, r2_score_val, acc_sco
         "detail": f"Achieved R² score = {r2_score_val:.3f}."
     })
 
-    # Condition 5: Classifier Model Accuracy
     acc_pass = acc_score_val >= 0.60
     checks.append({
         "rule": "Classifier Model Accuracy (>= 60%)",
@@ -369,7 +346,6 @@ def verify_dataset_conditions(df, salary_col, clean_stats, r2_score_val, acc_sco
         "detail": f"Achieved classification accuracy = {acc_score_val * 100:.1f}%."
     })
 
-    # Condition 6: Problem Statement File Attachment
     checks.append({
         "rule": "Problem Statement Attachment (.pdf)",
         "status": "PASS" if pdf_text_present else "INFO",
@@ -387,14 +363,11 @@ st.markdown('<p style="text-align: center; color: #94a3b8; font-size: 1.05rem; m
 st.sidebar.title("📂 Data & Document Ingestion")
 st.sidebar.caption("Upload your dataset CSV and Problem Statement PDF here:")
 
-# CSV & PDF File Uploaders side-by-side in sidebar
 uploaded_file = st.sidebar.file_uploader("Upload Job Dataset (.csv)", type=["csv"], key="csv_uploader")
 uploaded_pdf = st.sidebar.file_uploader("Upload Problem Statement (.pdf)", type=["pdf"], key="pdf_uploader")
 
-# Parse PDF text if available
 pdf_content = extract_pdf_text(uploaded_pdf) if uploaded_pdf is not None else None
 
-# Load CSV dataset or fallback
 if uploaded_file is not None:
     try:
         raw_df = pd.read_csv(uploaded_file)
@@ -406,14 +379,12 @@ else:
     st.sidebar.info("💡 Using built-in sample AI job dataset. Upload custom files above.")
     raw_df = generate_sample_data()
 
-# Process Data Pipeline
 (
     df_clean, df_encoded, encoders, options, model_1, model_2, 
     target_salary, target_tier, industry_col, m1_cols, m2_cols, 
     r2_m1, acc_m2, clean_stats
 ) = process_data_pipeline(raw_df)
 
-# Run Condition Verification
 verification_results = verify_dataset_conditions(
     df_clean, target_salary, clean_stats, r2_m1, acc_m2, pdf_content is not None
 )
@@ -421,7 +392,6 @@ verification_results = verify_dataset_conditions(
 st.sidebar.write("---")
 st.sidebar.title("📌 Candidate Profile Inputs")
 
-# Dynamic sidebar inputs matching dataframe schema
 input_data = {}
 for col in m1_cols:
     col_label = col.replace('_', ' ').title()
@@ -459,7 +429,6 @@ with tab_tableaudash:
     st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
     st.markdown('<div class="tableau-header"><h3>📈 Executive Compensation Analytics Dashboard</h3><span>Theme: Tableau Slate</span></div>', unsafe_allow_html=True)
 
-    # Top KPI Cards Row
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     avg_annual = float(df_clean[target_salary].mean())
     median_annual = float(df_clean[target_salary].median())
@@ -472,7 +441,6 @@ with tab_tableaudash:
     kpi4.markdown(f'''<div class="metric-box"><div class="metric-value">{total_records:,}</div><div class="metric-label">Cleaned Records</div></div>''', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Tableau Multi-Chart Grid
     col_chart1, col_chart2 = st.columns(2)
 
     with col_chart1:
@@ -498,24 +466,29 @@ with tab_tableaudash:
     with col_chart2:
         st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
         st.write("#### 📈 Experience vs Compensation Trajectory")
-        exp_col = [c for c in df_clean.columns if 'exp' in c or 'year' in c]
-        if exp_col:
+        
+        # STRICT BUG FIX: Only select strictly NUMERIC experience columns to prevent OLS string error
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        num_exp_cols = [c for c in numeric_cols if any(kw in c for kw in ['year', 'exp', 'years_of_experience']) and c != target_salary]
+        
+        selected_numeric_x = num_exp_cols[0] if num_exp_cols else (numeric_cols[0] if len(numeric_cols) > 0 else None)
+
+        if selected_numeric_x:
             fig_scat = px.scatter(
                 df_clean, 
-                x=exp_col[0], 
+                x=selected_numeric_x, 
                 y=target_salary, 
-                color='job_tier' if 'job_tier' in df_clean.columns else None,
+                color=target_tier if target_tier in df_clean.columns else None,
                 trendline="ols",
                 color_continuous_scale=px.colors.sequential.Viridis,
-                labels={exp_col[0]: 'Years of Experience', target_salary: 'Salary ($)'}
+                labels={selected_numeric_x: selected_numeric_x.replace('_', ' ').title(), target_salary: 'Salary ($)'}
             )
             fig_scat.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "#e2e8f0"}, height=320)
             st.plotly_chart(fig_scat, use_container_width=True)
         else:
-            st.info("No experience column found for trajectory plotting.")
+            st.info("No numeric experience column found for trajectory plotting.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Row 2: Distribution and Boxplot
     col_chart3, col_chart4 = st.columns(2)
 
     with col_chart3:
@@ -557,7 +530,6 @@ with tab_problem:
     st.subheader("📋 Dataset & Model Condition Verification Matrix")
     st.write("Automated compliance audit checking dataset integrity, PDF attachment, and model performance criteria:")
 
-    # Display Condition Checks Table
     for check in verification_results:
         c1, c2, c3 = st.columns([3, 1, 4])
         with c1:
@@ -566,7 +538,7 @@ with tab_problem:
             if check['status'] == 'PASS':
                 st.markdown('<span class="badge-pass">✔ PASS</span>', unsafe_allow_html=True)
             elif check['status'] == 'WARN':
-                st.markdown('<span class="badge-warn">⚠️️ WARN</span>', unsafe_allow_html=True)
+                st.markdown('<span class="badge-warn">⚠ WARN</span>', unsafe_allow_html=True)
             else:
                 st.markdown('<span class="badge-fail">✖ FAIL / INFO</span>', unsafe_allow_html=True)
         with c3:
@@ -575,7 +547,6 @@ with tab_problem:
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Display Problem Statement PDF Content or Specification
     st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
     st.subheader("📑 Problem Statement Specification")
 
@@ -609,7 +580,6 @@ with tab_clean:
     q4.metric("Target Salary Column", f"`{target_salary}`")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Model Performance Cards
     st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
     st.subheader("🎯 Machine Learning Model Scorecard")
 
@@ -629,7 +599,6 @@ with tab_clean:
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Data Preview Tables
     st.markdown('<div class="tableau-card">', unsafe_allow_html=True)
     col_a, col_b = st.columns(2)
     
